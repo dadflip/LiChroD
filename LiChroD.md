@@ -4,7 +4,7 @@
 
 Download Lichrod v3 for ChromeOS:
 
-[![Download Lichrod](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/lichrod/files/latest/download)
+[![Download Lichrod](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/lichro-d/files/latest/download)
 
 [![Download Lichrod v3 (deb)](https://drive.google.com/uc?export=download&id=1HYql1MKT_QGcvmr_qZ5EKDKOxiNRniAL)](https://drive.google.com/uc?export=download&id=1HYql1MKT_QGcvmr_qZ5EKDKOxiNRniAL)
 
