@@ -1,0 +1,606 @@
+#!/bin/bash
+
+
+# Variables
+
+#CURRENT_DIR=$(pwd)
+#MAIN_DIRECTORY=
+# Variable to track cancellation status
+cancel_requested=false
+
+
+#---------Systeme--------------
+BINARIES_DIRECTORY="/usr/bin"
+OPT_DIRECTORY="/opt"
+TMP_DIRECTORY="/tmp"
+
+
+#BOOT_DIRECTORY="/boot"
+#DEV_DIRECTORY="/dev"
+#ETC_DIRECTORY="/etc"
+#HOME_DIRECTORY="/home"
+#LIB_DIRECTORY="/lib"
+#LIB64_DIRECTORY="/lib64"
+#MNT_DIRECTORY="/mnt"
+#MEDIA_DIRECTORY="/media"
+#PROC_DIRECTORY="/proc"
+#ROOT_DIRECTORY="/root"
+#RUN_DIRECTORY="/run"
+#SBIN_DIRECTORY="/sbin"
+#SRV_DIRECTORY="/srv"
+#SYS_DIRECTORY="/sys"
+#USR_DIRECTORY="/usr"
+#VAR_DIRECTORY="/var"
+
+#---------MyApp-Dir-----------
+
+#MYAPP="$OPT_DIRECTORY/myapp"
+#MYAPP_MODULES="$MYAPP/modules"
+
+
+
+#Code
+
+sudo chmod +x -R $OPT_DIRECTORY/installation/* $OPT_DIRECTORY/myapp/* $BINARIES_DIRECTORY/lichrod-*
+
+# Install xterm if it's not already installed
+if ! command -v xterm &>/dev/null; then
+    sudo apt update
+    sudo apt install -y xterm
+fi
+
+# Launch xterm and display the installation of zenity
+xterm -e "sudo apt update && sudo apt install -y zenity"
+xterm -e "sudo apt install gsettings-desktop-schemas"
+
+
+
+
+
+#---------------Methods---------------
+
+# Function to display a status message
+display_status() {
+    echo "==> $1"
+}
+
+# Function to display a centered Zenity dialog
+display_zenity() {
+    zenity --info \
+    --width=600 \
+    --height=400 \
+    --text="$1" \
+    --title="Processing"
+}
+
+# Function to display a centered Zenity dialog for processes
+display_zenity_process() {
+    zenity --info \
+    --width=600 \
+    --height=400 \
+    --text="$1" \
+    --title="Processing"
+}
+
+# Function to display an XTerm window
+display_xterm() {
+    xterm -e "$1" &
+}
+
+# Function to install a set of tasks
+install_task() {
+    sudo tasksel install "$1"
+    display_status "Task set $1 has been installed successfully."
+}
+
+# Function to install a package
+install_package() {
+    sudo apt install -y "$1"
+    display_status "Package $1 has been installed successfully."
+}
+
+
+# Ask the user if they want to set a root password
+ask_root_password() {
+    zenity --question --title="Root Password" --text="Do you want to set a root password?"
+
+    if [[ $? -eq 0 ]]; then
+        display_xterm "sudo passwd root"
+    else
+        display_zenity "Password not changed!"
+    fi
+}
+
+# End of the script
+finish_script() {
+    display_zenity "Operations completed successfully."
+}
+
+# Function to display an installation completion message
+display_installation_complete() {
+    display_zenity "INSTALLATION COMPLETE. For more information, please read the contents of the READ_ME_LICHROD folder\nDadflip - 2023"
+    display_zenity "LiChroD has been successfully installed."
+}
+
+# Function to ask for confirmation or skipping an installation step
+confirm_or_skip() {
+    if ! $cancel_requested; then
+        zenity --question --width=600 --height=400 --title="Installation Confirmation" --text="$1\n\nDo you want to proceed with the installation?\n\n(Click 'Yes' to proceed, 'No' to cancel the entire LiChroD installation.)" --ok-label="Yes" --cancel-label="No"
+        response=$?
+
+        if [[ $response -eq 0 ]]; then
+            $2
+        elif [[ $response -eq 1 ]]; then
+            zenity --question --width=600 --height=400 --title="Cancel Installation" --text="Do you want to cancel the entire LiChroD installation?\n\nWARNING: This will cancel the entire installation!" --ok-label="Yes" --cancel-label="No"
+            cancel_response=$?
+
+            if [[ $cancel_response -eq 0 ]]; then
+                cancel_requested=true
+                display_zenity "Installation canceled"
+            else
+                cancel_requested=false
+                confirm_or_skip "$1" "$2"
+            fi
+        else
+            cancel_requested=false
+        fi
+    fi
+}
+
+
+# Function to install selected scripts
+install_selected_scripts() {
+    script_list=(
+        "Install Python" "python" "Python Installation"
+        "Install CMake" "cmake" "CMake Installation"
+        "Install Doxygen" "doxygen" "Doxygen Installation"
+        "Install Hashcat" "hashcat" "Hashcat Installation"
+        "Install Java" "java" "Java Installation"
+        "Install Utilities" "utils" "Utilities Installation"
+        "Install Windows 95" "win95" "Windows 95 Installation"
+    )
+
+    # Display the list of scripts to install and record user choices
+    install_scripts=$(zenity --list --checklist --column="Action" --column="Script" --column="Description" --title="Select scripts to install" --text="Check the scripts to install:" "${script_list[@]}")
+
+    # Variable to handle cancellation
+    cancel_requested=false
+
+    echo $install_scripts
+    choices=$(echo "$install_scripts" | tr '|' ' ')
+    echo $choices
+
+    IFS=' '                               # Set the internal field separator to space
+    read -ra script_choices <<<"$choices" # Read choices into an array
+
+    for script_choice in "${script_choices[@]}"; do
+        description=$(echo "$script_list" | awk -F '\t' -v choice="$script_choice" '$2 == choice {print $3}')
+
+        if ! $cancel_requested; then
+            # Confirm with the user before installing each script
+            confirm_or_skip "Do you want to install $description?" "$TMP_DIRECTORY/installation/lichrod/${script_choice//-/}-install.sh"
+        else
+            display_zenity "Script installation canceled."
+        fi
+    done
+}
+
+
+# Function to install Flatpak and useful applications
+install_flatpak_and_apps() {
+    display_zenity "Installing Flatpak and useful applications..."
+    $TMP_DIRECTORY/installation/lichrod/flatpak-install.sh
+    display_zenity "Installation completed."
+}
+
+# Update packages
+update_packages() {
+    display_status "/!\ Updating packages..."
+    display_xterm "sudo apt update"
+    display_xterm "sudo dpkg --configure -a"
+    display_xterm "sudo apt-get install -f"
+    display_status "===> Update completed."
+}
+
+# Installation of basic packages
+install_base_packages() {
+    display_zenity_process "Welcome to the installation of basic packages!\n This script will install essential packages on your system."
+
+    display_status "Installing basic packages..."
+    (
+        install_package htop
+        install_package terminator
+        install_package xterm
+        install_package aptitude
+        install_package nano
+        install_package neofetch
+        install_package tasksel
+        install_package gdebi
+        install_package yad
+        install_package rsync
+        install_package meld
+        install_package ffmpeg
+        install_package easytag
+        install_package unzip
+        install_package synaptic
+        install_package wget
+        install_package dpkg
+        install_package npm
+        install_package nasm
+        echo "FINISHED"
+    ) | zenity --text-info --title="Process"
+
+    display_status "Configuring Terminator..."
+    sudo mkdir -p /etc/xdg/terminator/
+    sudo touch /etc/xdg/terminator/config
+    display_status "Terminator configuration has been created."
+
+    display_status "Installation of basic packages is completed."
+}
+
+
+install_theme() {
+    display_xterm "$TMP_DIRECTORY/installation/lichrod/theme-install-default.sh"
+}
+
+# Installation of desktop, web servers, and SSH
+install_desktop_web_ssh() {
+    display_zenity "Welcome to the installation of the desktop, web servers, and SSH!\n This script will install the desktop, web servers, and SSH on your system."
+
+    display_zenity_process "Installation of Tasksel will begin."
+
+    display_xterm "sudo tasksel install desktop web-server ssh-server"
+}
+
+# Creating the directory for website editing and linking to Apache
+create_website_and_link() {
+    display_zenity "Creating the website editing directory and linking to Apache..."
+    WEBSITE_DIRECTORY="$HOME/mywebsite"
+    mkdir "$WEBSITE_DIRECTORY"
+    touch "$WEBSITE_DIRECTORY/index.php"
+    sudo ln -s "$WEBSITE_DIRECTORY" /var/www/html/mywebsite
+    display_zenity "The website directory has been created and linked to Apache."
+}
+
+# Install Flatpak and useful applications
+install_flatpak_and_apps() {
+    display_zenity "Welcome to the installation and configuration script! This script will perform several operations to install Flatpak, useful applications, and configure the desktop."
+
+    zenity --question --text="Do you want to install Flatpak and some useful applications?"
+    if [ "$?" -eq 0 ]; then
+        $TMP_DIRECTORY/installation/lichrod/flatpak-install.sh
+    else
+        display_zenity "Installation canceled."
+    fi
+}
+
+# Choose terminal language
+configure_language() {
+    zenity --question --text="Do you want to configure the language for the desktop and terminal?"
+    if [ "$?" -eq 0 ]; then
+        display_status "Configuring desktop and terminal - language..."
+        display_xterm "$TMP_DIRECTORY/installation/lichrod/lichrod-language.sh"
+        display_zenity "Configuration completed."
+    else
+        display_zenity "Configuration of the desktop and terminal canceled."
+    fi
+}
+
+
+# Affichage des informations sur les paquets additionnels
+display_additional_packages_info() {
+    display_zenity "Des paquets additionnels sont disponibles. Ils comprennent : \n- Mariadb et Phpmyadmin \n- Des applications Gnome supplementaires (desktop folders et main menu) \n- Un outil de securisation et de scan de votre serveur \n- Des themes prets a l'emploi pour votre environnement de bureau."
+}
+
+# Installation des paquets additionnels
+install_additional_packages() {
+    zenity --question --text="Souhaitez-vous installer les paquets additionnels ?"
+    if [ "$?" -eq 0 ]; then
+        display_zenity "Installation des paquets additionnels..."
+        display_xterm "$TMP_DIRECTORY/installation/lichrod/gnome-assets.sh && $TMP_DIRECTORY/installation/lichrod/mariadb-phpmyadmin-install.sh && $TMP_DIRECTORY/installation/lichrod/server-security-assets.sh"
+
+        display_xterm "sudo apt-get install -y emerald compizconfig-settings-manager"
+        display_xterm "chmod +x \"$BINARIES_DIRECTORY/lichrod-sort-pictures.sh\""
+
+        display_zenity "Installation et configuration de Node-red..."
+        display_xterm "bash <(curl -sL https://raw.githubusercontent.com/node-red/linux-installers/master/deb/update-nodejs-and-nodered) --node18"
+        display_xterm "node-red admin init"
+        display_zenity "Node-red a ete installe et configure."
+    else
+        display_zenity "Installation des paquets additionnels annulee."
+    fi
+}
+
+# Affichage des informations sur les paquets additionnels
+display_additional_packages_info_2() {
+    display_zenity "Des paquets additionnels sont disponibles. Ils comprennent :\n- LibreOffice\n- R Studio"
+}
+
+# Installation des paquets additionnels
+install_additional_packages_2() {
+    install_additional_packages=$(zenity --question --text="Souhaitez-vous installer ces paquets ?")
+
+    if [[ $install_additional_packages -eq 0 ]]; then
+
+        mkdir -p ~/Downloads
+        sudo apt install -y transmission-cli
+
+        # Demander le numéro de version à l'utilisateur
+        libreoffice_version=$(zenity --entry --title="Numero de version" --text="Entrez le numero de version de LibreOffice (par exemple, 7.5.5) :")
+
+        # Adapter l'URL en fonction du numéro de version saisi
+        libreoffice_url="https://download.documentfoundation.org/libreoffice/stable/$libreoffice_version/deb/x86_64/LibreOffice_${libreoffice_version}_Linux_x86-64_deb.tar.gz"
+
+        # Afficher le message de démarrage
+        display_zenity "Telechargement et installation de LibreOffice $libreoffice_version ..."
+
+        # Télécharger le fichier torrent dans ~/Downloads
+        curl -Lo ~/Downloads/LibreOffice_${libreoffice_version}_Linux_x86-64_deb.tar.gz "$libreoffice_url"
+
+        # Trouver le nom du fichier téléchargé
+        downloaded_file=$(find ~/Downloads -name 'LibreOffice_*_Linux_x86-64_deb.tar.gz')
+
+        # Extraire le contenu de l'archive tar.gz
+        tar -xzf "$downloaded_file" -C /home/$USER/
+
+        # Trouver le nom du fichier téléchargé
+        extracted_dir=$(find ~/ -name 'LibreOffice_*_Linux_x86-64_deb')
+
+        # Installer les paquets DEB
+        xterm -e "sudo dpkg -i '$extracted_dir/DEBS'/*.deb"
+
+        # Nettoyer les fichiers téléchargés
+        rm -f "$downloaded_file"
+        rm -r "$extracted_dir"
+
+        # Afficher le message de réussite
+        display_zenity "LibreOffice $libreoffice_version a ete installe avec succes."
+
+        display_zenity "Installation de R Studio..."
+        sudo systemctl restart networking
+        xterm -e "sudo apt -y install r-base"
+
+        xterm -e "wget https://download2.rstudio.org/server/bionic/amd64/rstudio-server-2022.07.1-554-amd64.deb -P ~/Downloads"
+        sudo dpkg -i ~/Downloads/rstudio-server-2022.07.1-554-amd64.deb
+
+        xterm -e "wget https://download1.rstudio.org/desktop/bionic/amd64/rstudio-2021.09.0-351-amd64.deb -P ~/Downloads"
+        sudo dpkg -i ~/Downloads/rstudio-2021.09.0-351-amd64.deb
+
+        display_zenity "R Studio a ete installe avec succes."
+
+        rm -f ~/Downloads/rstudio-server-2022.07.1-554-amd64.deb
+        rm -f ~/Downloads/rstudio-2021.09.0-351-amd64.deb
+
+    else
+        display_zenity "Installation des paquets additionnels annulee."
+    fi
+}
+
+# Affichage des informations sur l'operation
+display_links_info() {
+    display_zenity "Ce script cree le fichier 'links.html' avec des liens vers des sites utiles et une feuille de style associee."
+}
+
+# Creation du fichier links.html et de la feuille de style links.css
+create_links_file() {
+    reponse=$(zenity --question --text="Voulez-vous creer le fichier links.html ?")
+
+    if [ "$reponse" -eq 0 ]; then
+        # Contenu HTML du fichier links.html
+        html_content="<!DOCTYPE html>
+        <html>
+        <head>
+        <meta charset='utf-8'>
+        <title>Sites Utiles</title>
+        <link href='https://fonts.googleapis.com/css?family=Open+Sans+Condensed:300|Sonsie+One' rel='stylesheet' type='text/css'>
+        <link rel='stylesheet' href='links.css'>
+        </head>
+        <body>
+        <header>
+        <h1>Sites Utiles</h1>
+        </header>
+        <!-- Navigation -->
+        <main>
+        <p>
+        <a href='https://pkgs.org/' >PKGS.org</a> - Un site pour installer des packages divers <br>
+        <a href='https://www.flaticon.com/' >FLATICON</a> - Un site pour télécharger des icônes PNG, SVG et autres <br>
+        <a href='https://universal-soundbank.com/' >UNIVERSAL SOUNDBANK</a> - Bruitages et sons <br>
+        <a href='https://www.gnome-look.org/browse/' >GNOME LOOK</a> - Installez d'autres thèmes pour votre bureau <br>
+        <a href='https://flathub.org/home' >FLATHUB</a> - Un site pour installer des Flatpaks <br>
+        <a href='https://www.debian.org/' >Site de Debian</a> - Site officiel de la distribution Debian <br>
+        <a href='https://ubuntu.com/' >Site d'Ubuntu</a> - Site officiel de la distribution Ubuntu <br>
+        </p>
+        </main>
+        </body>
+        </html>"
+
+        # Créer le fichier links.html
+        echo "$html_content" | tee "$HOME/READ_ME_LICHROD/links.html"
+        display_zenity "Le fichier links.html a ete cree avec succes."
+
+        # Contenu de la feuille de style links.css
+        css_content="/* Feuille de style pour la page links.html */
+
+body {
+font-family: 'Open Sans Condensed', sans-serif;
+}
+
+header {
+background-color: #0074d9;
+color: white;
+text-align: center;
+padding: 10px;
+}
+
+main {
+margin: 20px;
+}
+
+a {
+color: #0074d9;
+text-decoration: none;
+}
+
+a:hover {
+text-decoration: underline;
+}"
+
+        # Creer le fichier links.css
+        echo "$css_content" | tee "/home/$USER/READ_ME_LICHROD/links.css"
+        display_zenity "La feuille de style links.css a ete cree avec succes."
+    else
+        display_zenity "Le fichier links.html n'a pas ete cree."
+    fi
+}
+
+# Affichage de l'en-tete
+display_header() {
+    display_zenity "Ce script installera les paquets et configurations necessaires sur votre systeme."
+}
+
+# Installation de localepurge
+install_localepurge() {
+    display_zenity "Installation de localepurge..."
+    sudo apt install -y localepurge
+}
+
+# Configuration des scripts d'installation
+configure_installation_scripts() {
+    $TMP_DIRECTORY/installation/lichrod/config.sh
+    display_zenity "Les scripts d'installation ont ete configures avec succes."
+}
+
+# Rendre les scripts executables dans le dossier principal
+make_scripts_executable() {
+    display_zenity "Bienvenue dans le script d'installation et de configuration ! Ce script effectuera plusieurs operations pour rendre les scripts executables et configurer un site web."
+
+    display_zenity "Rendre les scripts executables..."
+    cd "$TMP_DIRECTORY/installation/lichrod" || exit
+    chmod -R +x *.sh
+    display_zenity "Les scripts ont ete rendus executables."
+}
+
+############################################################################################################
+
+sudo apt install -y zenity xterm
+
+# Création du dossier READ_ME_LICHROD dans le répertoire de l'utilisateur
+xterm -e "mkdir '/home/$USER/READ_ME_LICHROD'"
+
+# Création du dossier pour les bibliothèques
+xterm -e "mkdir -p '/home/$USER/.lichrod/libs'"
+
+# Donner les permissions d'exécution aux scripts d'installation
+xterm -e "sudo chmod +x '$TMP_DIRECTORY/installation/lichrod/*.sh'"
+
+if [ -d "$OPT_DIRECTORY/installation" ]; then
+    if [ ! -d "$TMP_DIRECTORY/installation" ]; then
+        xterm -e "sudo cp -r '$OPT_DIRECTORY/installation' '$TMP_DIRECTORY/'"
+        echo "Copie effectuée avec succès."
+    else
+        echo "Le dossier destination existe déjà. La copie n'a pas été effectuée."
+    fi
+else
+    echo "Le dossier source n'existe pas."
+fi
+
+# Redémarrer les services de réseau
+display_xterm "sudo systemctl restart networking"
+
+install_theme
+
+# Appel de la fonction pour demander à l'utilisateur s'il souhaite définir un mot de passe root
+ask_root_password
+
+# Afficher une fenêtre Zenity pour demander si l'utilisateur souhaite installer LiChroD
+zenity --question --title="Installation de LiChroD" --text="Voulez-vous installer LiChroD ?"
+
+if [[ $? -eq 0 ]]; then
+
+    update_packages
+
+    if ! $cancel_requested; then
+        # Appel de la fonction pour installer les paquets de base
+        confirm_or_skip "Voulez-vous installer les paquets de base ?" "install_base_packages"
+    fi
+
+    if ! $cancel_requested; then
+        # Appel de la fonction pour installer le bureau, les serveurs web et SSH
+        confirm_or_skip "Voulez-vous installer le bureau, les serveurs web et SSH ?" "install_desktop_web_ssh"
+        display_xterm "$TMP_DIRECTORY/installation/lichrod/lichrod-language.sh"
+    fi
+
+    if ! $cancel_requested; then
+        # Appel de la fonction pour rendre les scripts executables
+        make_scripts_executable
+
+        # Appel de la fonction pour creer le dossier du site web et le lier a Apache
+        create_website_and_link
+
+        # Appel des fonctions pour installer Flatpak et applications utiles
+        confirm_or_skip "Voulez-vous installer Flatpak et les applications utiles ?" "install_flatpak_and_apps"
+    fi
+
+    if ! $cancel_requested; then
+        # Appel de la fonction pour configurer la langue du terminal
+        confirm_or_skip "Voulez-vous configurer la langue du terminal ?" "configure_language"
+    fi
+
+    if ! $cancel_requested; then
+        # Appel de la fonction pour afficher les informations sur les paquets additionnels
+        display_additional_packages_info
+
+        # Appel de la fonction pour installer les paquets additionnels
+        confirm_or_skip "Voulez-vous installer les paquets additionnels ?" "install_additional_packages"
+    fi
+
+    if ! $cancel_requested; then
+        # Appel de la fonction pour afficher les informations sur les paquets additionnels
+        display_additional_packages_info_2
+
+        # Appel de la fonction pour installer les paquets additionnels
+        confirm_or_skip "Voulez-vous installer les paquets additionnels ?" "install_additional_packages_2"
+
+        # Appel de la fonction pour afficher un message de fin de script
+        finish_script
+    fi
+
+    if ! $cancel_requested; then
+        # Affichage de l'en-tete
+        display_zenity "Bienvenue dans le script d'installation et de configuration ! Ce script effectuera plusieurs operations pour installer des applications utiles et configurer le bureau."
+
+        # Appel de la fonction pour installer les scripts selectionnes
+        install_selected_scripts
+
+        # Appel de la fonction pour afficher un message de fin de script
+        finish_script
+    fi
+
+    if ! $cancel_requested; then
+        # Appel de la fonction pour afficher les informations sur l'operation
+        display_links_info
+
+        # Appel de la fonction pour creer le fichier links.html et la feuille de style links.css
+        confirm_or_skip "Voulez-vous creer le fichier de liens utiles links.html et la feuille de style links.css ?" "create_links_file"
+    fi
+
+    if ! $cancel_requested; then
+        # Appel de la fonction pour afficher l'en-tete
+        display_header
+
+        # Appel de la fonction pour configurer les scripts d'installation
+        confirm_or_skip "Voulez-vous installer tensorflow et html-csv-cli ?" " configure_installation_scripts"
+
+        # Appel de la fonction pour afficher un message de fin d'installation
+        finish_script
+
+        # Appel de la fonction pour afficher un message de fin d'installation
+        display_installation_complete
+    fi
+
+    exit 0
+
+else
+    zenity --info --text="Installation de LiChroD annulee."
+    exit 0
+fi
