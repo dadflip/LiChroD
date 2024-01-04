@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# Vérifier si Zenity est installé
+if ! command -v zenity &> /dev/null; then
+    # Zenity n'est pas installé, tenter de l'installer
+    sudo apt update
+    sudo apt install -y zenity
+fi
+
+# Liste des dossiers et du fichier à vérifier
+items_to_check=(
+    "/usr/lib/python3.9/playsound.py"
+    "/usr/lib/python3.9/playsound-1.3.0.dist-info"
+    "/usr/lib/python3.9/pyttsx3"
+    "/usr/lib/python3.9/pyttsx3-2.90.dist-info"
+    "/usr/lib/python3.9/espeakng"
+    "/usr/lib/python3.9/py_espeak_ng-0.1.8.dist-info"
+)
+
+missing_items=()
+
+# Vérifier l'existence de chaque élément
+for item in "${items_to_check[@]}"; do
+    if [ ! -e "$item" ]; then
+        missing_items+=("$item")
+    fi
+done
+
+# Si des éléments sont manquants, afficher un message d'erreur et quitter
+if [ ${#missing_items[@]} -gt 0 ]; then
+    error_message="Certains éléments sont manquants :\n\n"
+    for missing_item in "${missing_items[@]}"; do
+        error_message+=" $missing_item\n"
+    done
+    zenity --error --title="Éléments manquants" --text="$error_message"
+    exit 1
+fi
+
+# Autoriser l'accès à Xhost
+xhost +
+
+# Lancer l'application Python
+/bin/python3 /opt/myapp/MyApp/app.py

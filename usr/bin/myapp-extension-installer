@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# Vérifier si Zenity est installé
+if ! command -v yad &> /dev/null; then
+    # yad n'est pas installé, tenter de l'installer
+    sudo apt update
+    sudo apt install -y yad
+fi
+
+# Demander à l'utilisateur s'il veut prendre les droits superutilisateur
+sudo_rights=$(yad --list --radiolist \
+    --title="Droits superutilisateur" \
+    --text="Selectionnez les droits superutilisateur :" \
+    --column="Selection" --column="Droits" \
+    FALSE "Non" \
+    FALSE "sudo" \
+    FALSE "su (connexion en root)" \
+    --width=300 --height=200)
+
+# Vérifier si l'utilisateur a annulé la sélection
+if [ $? -eq 1 ]; then
+    exit
+fi
+
+# Demander à l'utilisateur de sélectionner un fichier
+file=$(yad --file-selection --title="Selectionner un fichier" --width=500 --height=300)
+
+# Vérifier si l'utilisateur a annulé la sélection
+if [ $? -eq 1 ]; then
+    exit
+fi
+
+# Obtenir l'extension du fichier
+extension="${file##*.}"
+
+if [ "$extension" == "deb" ]; then
+    # Installer le fichier .deb avec dpkg
+    if [ "$sudo_rights" == "sudo" ]; then
+        sudo dpkg -i "$file"
+    elif [ "$sudo_rights" == "su (connexion en root)" ]; then
+        su -c "dpkg -i $file"
+    else
+        yad --info --text="L'installation de fichier .deb ne nécessite pas de droits superutilisateur." --width=300 --height=100
+    fi
+else
+    # Demander s'il s'agit d'une app ou d'un script
+    app_or_script=$(yad --list --radiolist \
+        --title="Type de fichier" \
+        --text="Selectionnez le type de fichier :" \
+        --column="Selection" --column="Type" \
+        FALSE "Script d'installation" \
+        FALSE "Application" \
+        FALSE "Commande" \
+        --width=300 --height=200)
+
+    echo $app_or_script
+    
+    # Vérifier si l'utilisateur a annulé la sélection
+    if [ $? -eq 1 ]; then
+        exit
+    fi
+
+    if [ "$app_or_script" == "TRUE|Application|" ]; then
+        # Créer le fichier binaire et le fichier desktop
+        binary_file="/usr/bin/$(basename "$file" .sh)"
+
+        sudo mv "$file" "$binary_file"
+        sudo chmod +x "$binary_file"
+
+        desktop_file="/usr/share/applications/$(basename "$file" .sh).desktop"
+
+        echo "[Desktop Entry]" | sudo tee "$desktop_file" > /dev/null
+        echo "Name=$(basename "$file" .sh)" | sudo tee -a "$desktop_file" > /dev/null
+        echo "Exec=$binary_file %U" | sudo tee -a "$desktop_file" > /dev/null
+        echo "Type=Application" | sudo tee -a "$desktop_file" > /dev/null
+        echo "Terminal=false" | sudo tee -a "$desktop_file" > /dev/null
+
+        yad --info --text="Installation terminee !" --title="Termine" --width=300 --height=100
+        
+        # Lancer l'application
+        "$binary_file"
+        
+    elif [ "$app_or_script" == "TRUE|Script d'installation|" ]; then
+        chmod +x "$file"
+        # Exécuter le fichier
+        if [ "$sudo_rights" == "sudo" ]; then
+            sudo "$file" | yad --text-info --title="Installation du script..." --width=500 --height=300
+        elif [ "$sudo_rights" == "su (connexion en root)" ]; then
+            echo "$file" | su -c "$(cat)" | yad --text-info --title="Installation du script..." --width=500 --height=300
+        else
+            "$file" | yad --text-info --title="Installation du script..." --width=500 --height=300
+        fi
+    elif [ "$app_or_script" == "TRUE|Commande|" ]; then
+        # Obtenir le nom de la commande
+        command_name=$(basename "$file")
+
+        # Déplacer le fichier dans /usr/bin et le rendre exécutable
+        binary_file="/usr/bin/$command_name"
+        sudo mv "$file" "$binary_file"
+        sudo chmod +x "$binary_file"
+
+        yad --info --text="Commande enregistree avec succes !" --title="Termine" --width=300 --height=100
+    fi
+fi
+
+# Afficher une fenêtre d'information pour indiquer que les opérations sont terminées
+yad --info --text="Operations terminees !" --title="Termine" --width=300 --height=100

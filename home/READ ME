@@ -1,0 +1,20 @@
+Auteur: Davide C. (Dadflip)
+
+
+########################français#####################################
+Déplacez votre archive depuis downloads vers fichier linux (avec l'explorateur de fichiers chromebook)
+Ouvrez un terminal:
+décompressez l'archive avec la commande: tar -xzvf LiChroD.tar.gz
+rendez les fichiers exécutables avec: sudo chmod +x LiChroD/*.sh
+accédez au dossier Logiciels : cd LiChroD/
+lancez l'installation: ./install.sh
+
+
+#######################world########################################
+Move your archive from downloads to linux files (with chromebook file explorer)
+Open a terminal:
+unzip the archive with the command: tar -xzvf LiChroD.tar.gz
+make the files executable with: sudo chmod +x LiChroD/*.sh
+go to the Logiciels folder: cd LiChroD/
+start the installation: ./install.sh
+

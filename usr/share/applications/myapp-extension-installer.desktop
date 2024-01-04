@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=MyApp-Exe
+Exec=myapp-extension-installer
+Icon=myapp-ext
+Type=Application
+Categories=Utility;

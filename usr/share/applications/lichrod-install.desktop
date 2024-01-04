@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=LiChroD-v3
+Exec=/opt/lichrod-install
+Icon=lichrod-install
+Type=Application
+Categories=Utility;
